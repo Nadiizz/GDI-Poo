@@ -1,0 +1,225 @@
+import sqlite3
+
+# Clase Padre para manejar la conexión a la base de datos
+class BaseDeDatos:
+    def __init__(self, db_name):
+        self._db_name = db_name
+        self._conn    = None
+
+    def conectar(self):
+        self._conn   = sqlite3.connect(self._db_name)
+        self._cursor = self._conn.cursor()
+        self.crear_tabla_productos()
+
+    def cerrar_conexion(self):
+        if self._conn:
+            self._conn.close()
+
+    def crear_tabla_productos(self):
+        self._cursor.execute('''
+            CREATE TABLE IF NOT EXISTS productos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                cantidad INTEGER NOT NULL,
+                precio REAL NOT NULL
+            )
+        ''')
+        self._conn.commit()
+
+# Clase para el manejo del inventario (Clase hija, Hereda de BaseDeDatos)
+class Inventario(BaseDeDatos):
+    def __init__(self, db_name):
+        super().__init__(db_name)
+
+    
+    @property  # El getter devuelve la variable como privada
+    def conexion(self):
+        return self._conn
+
+
+    @conexion.setter # El setter permite asignar un valor a la variable privada 
+    def conexion(self, value):
+        self._conn = value
+
+
+    def agregar_producto(self, nombre, cantidad, precio): # Funcion para agrerar producto (Opcion 1)
+
+        self._cursor.execute('''
+            INSERT INTO productos (nombre, cantidad, precio)
+            VALUES (?, ?, ?)
+        ''', (nombre, cantidad, precio))
+        self._conn.commit()
+
+
+        print ("--------------------------------------------------------------")
+        print ("                                                              ")
+        print (f"Producto '{nombre}' agregado con éxito.")
+        print ("                                                              ")
+        print ("--------------------------------------------------------------")
+
+
+    def ver_productos(self):                              # Funcion para ver los productos (Opcion 2)
+        self._cursor.execute('SELECT * FROM productos')
+        productos = self._cursor.fetchall()
+
+        if productos:
+
+            print("\nInventario de Productos:")
+
+            for producto in productos:
+
+                print ("--------------------------------------------------------------")
+                print ("                                                              ")
+                print (f"ID: {producto[0]}, Nombre: {producto[1]}, Cantidad: {producto[2]}, Precio: ${producto[3]:.2f}")
+                print ("                                                              ")
+                print ("--------------------------------------------------------------")
+
+        else:
+            print ("--------------------------------------------------------------")
+            print ("                                                              ")
+            print ("No hay productos en el inventario.")
+            print ("                                                              ")
+            print ("--------------------------------------------------------------")
+
+
+    def actualizar_stock(self, id_producto, nueva_cantidad):# Funcion para actulizar productos (Opcion 3)
+
+        self._cursor.execute('''
+            UPDATE productos
+            SET cantidad = ?
+            WHERE id = ?
+        ''', (nueva_cantidad, id_producto))
+
+        self._conn.commit()
+
+        print ("--------------------------------------------------------------")
+        print ("                                                              ")
+        print (f"Stock del producto con ID {id_producto} actualizado a {nueva_cantidad}.")
+        print ("                                                              ")
+        print ("--------------------------------------------------------------")
+        #
+        #
+        # Hacer que no actualice productos inexistentes 
+        #
+
+    def eliminar_producto(self, id_producto):# Funcion para eliminar el producto (Opcion 4)
+        self._cursor.execute('DELETE FROM productos WHERE id = ?', (id_producto,))
+        self._conn.commit()
+        if self._cursor.rowcount > 0:
+
+            print ("--------------------------------------------------------------")
+            print ("                                                              ")
+            print (f"Producto con ID {id_producto} eliminado con éxito.")
+            print ("                                                              ")
+            print ("--------------------------------------------------------------")
+
+        else:
+            print ("--------------------------------------------------------------")
+            print ("                                                              ")
+            print (f"No se encontró un producto con ID {id_producto}.")
+            print ("                                                              ")
+            print ("--------------------------------------------------------------")
+
+    def buscar_producto_por_id(self, id_producto):# Funcion para buscar producto por id (opcion 5)
+        self._cursor.execute('SELECT * FROM productos WHERE id = ?', (id_producto,))
+        producto = self._cursor.fetchone()
+        if producto:
+            print  (f"\nProducto encontrado: ID: {producto[0]}, Nombre: {producto[1]}, Cantidad: {producto[2]}, Precio: ${producto[3]:.2f}")
+        else:
+             print ("--------------------------------------------------------------")
+             print ("                                                              ")
+             print (f"No se encontró un producto con ID {id_producto}.")
+             print ("                                                              ")
+             print ("--------------------------------------------------------------")
+
+    def buscar_producto_por_nombre(self, nombre_producto): # Funcion para buscar producto por nombre (Opcion 5)
+        self._cursor.execute('SELECT * FROM productos WHERE nombre LIKE ?', ('%' + nombre_producto + '%',))
+        productos = self._cursor.fetchall()
+
+        if productos:
+
+            print(f"\nProductos encontrados con el nombre '{nombre_producto}':")
+            
+            for producto in productos: # Sentencia for que recorre en bucle para encontrar el producto especificado dentro de la base de datos
+                print(f"ID: {producto[0]}, Nombre: {producto[1]}, Cantidad: {producto[2]}, Precio: ${producto[3]:.2f}")
+
+        else:
+            print ("--------------------------------------------------------------")
+            print ("                                                              ")
+            print (f"No se encontró un producto con el nombre '{nombre_producto}'.") 
+            print ("                                                              ")
+            print ("--------------------------------------------------------------")
+
+    
+    def buscar_producto(self, entrada): # Función que usa tanto ID como el nombre para buscar un producto
+        if entrada.isdigit():  # Si la entrada es un número, buscar por ID (isdigit verifica que todos los caracteres son digitos)
+            self.buscar_producto_por_id(int(entrada)) # Se usa un int para que si se busque como un digito
+        else: 
+            self.buscar_producto_por_nombre(entrada) # Si no es un digito, busca el por nombre
+
+# Clase para el menú de la aplicación
+class Menu:
+    def __init__(self, inventario):
+        self.inventario = inventario
+
+    def mostrar(self):
+        while True:
+            print ("\n--- Menú de Gestión de Inventario ---")
+            print ("1. Agregar Producto")
+            print ("2. Ver Productos")
+            print ("3. Actualizar Stock")
+            print ("4. Eliminar Producto")
+            print ("5. Buscar Producto")
+            print ("6. Salir")
+
+            opcion = input("Elige una opción: ")
+
+            try:   
+
+                if opcion == '1':
+                    nombre   = input ("Nombre del producto: ")
+                    cantidad = int   (input("Cantidad: "))
+                    precio   = float (input("Precio: "))
+                    self.inventario.agregar_producto(nombre, cantidad, precio)
+
+                elif opcion == '2':
+                    self.inventario.ver_productos()
+
+                elif opcion == '3':
+                    id_producto    = int(input("ID del producto a actualizar: "))
+                    nueva_cantidad = int(input("Nueva cantidad: "))
+                    self.inventario.actualizar_stock(id_producto, nueva_cantidad)
+
+                elif opcion == '4':
+                  id_producto = int(input("ID del producto a eliminar: "))
+                  self.inventario.eliminar_producto(id_producto)
+
+                elif opcion == '5':
+                    entrada = input("Ingresa el ID o nombre del producto a buscar: ")
+                    self.inventario.buscar_producto(entrada)
+
+                elif opcion == '6':
+                    print("Saliendo del sistema.")
+                    self.inventario.cerrar_conexion()
+                    
+                    
+                    break
+
+
+            except ValueError:
+        
+             print ("----------------------------")
+             print ("                            ")
+             print ("Error, valor mal ingresado  ")
+             print ("Vuelva a ingresar los datos.")
+             print ("                            ")
+             print ("                            ")
+             print ("----------------------------")
+    
+
+# Uso del programa
+if __name__ == "__main__":
+    inventario = Inventario('inventario.db')
+    inventario.conectar()
+    menu = Menu(inventario)
+    menu.mostrar()
